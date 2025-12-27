@@ -53,6 +53,19 @@ async def register():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+@app.route('/unregister/<service_id>', methods=['DELETE'])
+async def unregister(service_id):
+    if not service_id:
+        return jsonify({"error": "Missing required field: id"}), 400
+    
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute('DELETE FROM services WHERE id = ?', (service_id,))
+            await db.commit()
+        return jsonify({"message": "Service unregistered successfully", "id": service_id}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/get/<service_id>', methods=['GET'])
 async def get_service(service_id):
     async with aiosqlite.connect(DB_PATH) as db:

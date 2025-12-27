@@ -24,6 +24,17 @@ Quart app for registering service workers with their urls, ids and scopes (scope
 }
 ```
 
+### Unregister Service `DELETE`
+`/unregister/<id>`
+
+**Response (200)**:
+```json
+{
+  "message": "Service unregistered successfully",
+  "id": "service-id"
+}
+```
+
 ### Get Service Details `GET`
 `/get/<id>`
 
