@@ -126,7 +126,7 @@ async def proxy_request(service_id, subpath):
                         
                 return response
         except aiohttp.ClientError as e:
-             return jsonify({"error": f"Intrenal upstream error: {str(e)}"}), 502
+             return jsonify({"error": f"Internal upstream error: {str(e)}"}), 502
         except Exception as e:
             return jsonify({"error": f"Internal proxy error: {str(e)}"}), 500
 
