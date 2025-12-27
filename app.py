@@ -19,35 +19,6 @@ async def init_db():
         ''')
         await db.commit()
 
-# Testing routes
-
-@app.route('/list')
-async def index():
-    return await render_template('index.html')
-
-@app.route('/api/services', methods=['GET'])
-async def list_services():
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
-        async with db.execute('SELECT * FROM services') as cursor:
-            rows = await cursor.fetchall()
-            services = []
-            for row in rows:
-                try:
-                    scopes = json.loads(row['scopes'])
-                except json.JSONDecodeError:
-                    scopes = row['scopes'].split(',')
-                
-                services.append({
-                    "id": row['id'],
-                    "url": row['url'],
-                    "scopes": scopes
-                })
-            return jsonify(services)
-
-
-#
-
 @app.route('/register', methods=['POST'])
 async def register():
     data = await request.get_json()
