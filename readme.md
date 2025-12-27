@@ -38,8 +38,6 @@ Quart app for registering service workers with their urls, ids and scopes (scope
 
 ### Proxy Request `ANY` (GET, POST, PUT, DELETE, PATCH)
 `/request/<id>/<relativepath>`
-**Method**: 
-**Description**: Make a request to the service url by id.
 
 **Headers**:
 - `X-Service-ID`: `<caller_service_id>` (Required)
