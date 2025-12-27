@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ForwarderMesh Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+        .scope-tag {
+            display: inline-block;
+            background-color: #e1ecf4;
+            color: #39739d;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            margin-right: 4px;
+            border: 1px solid #e1ecf4;
+        }
+        .scope-request {
+            background-color: #d4edda;
+            color: #155724;
+            border-color: #c3e6cb;
+        }
+        .scope-receive {
+            background-color: #fff3cd;
+            color: #856404;
+            border-color: #ffeeba;
+        }
+        .refresh-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            float: right;
+        }
+        .refresh-btn:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        AI generated frontend for testing
+        <h2>Register New Service</h2>
+        <form id="registerForm" onsubmit="registerService(event)">
+            <div style="margin-bottom: 15px;">
+                <label for="serviceId" style="display: block; margin-bottom: 5px; font-weight: 500;">Service Path:</label>
+                <input type="text" id="serviceId" name="id" placeholder="e.g. my-service" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label for="serviceUrl" style="display: block; margin-bottom: 5px; font-weight: 500;">Pointing to:</label>
+                <input type="url" id="serviceUrl" name="url" placeholder="http://localhost:8000" required style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 15px;">
+                <label style="display: block; margin-bottom: 5px; font-weight: 500;">Scopes:</label>
+                <div>
+                    <input type="checkbox" id="scopeRequest" name="scopes" value="request">
+                    <label for="scopeRequest" style="margin-right: 15px;">request</label>
+                    
+                    <input type="checkbox" id="scopeReceive" name="scopes" value="receive">
+                    <label for="scopeReceive">receive</label>
+                </div>
+            </div>
+            <button type="submit" style="background-color: #28a745; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 1em;">Register Service</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <button class="refresh-btn" onclick="fetchServices()">Refresh</button>
+        <h1>ForwarderMesh Services</h1>
+        <div id="loading">Loading services...</div>
+        <table id="servicesTable" style="display: none;">
+            <thead>
+                <tr>
+                    <th>Service ID</th>
+                    <th>Target URL</th>
+                    <th>Scopes</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="servicesBody">
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        async function registerService(event) {
+            event.preventDefault();
+            const id = document.getElementById('serviceId').value;
+            const url = document.getElementById('serviceUrl').value;
+            const scopes = [];
+            if (document.getElementById('scopeRequest').checked) scopes.push('request');
+            if (document.getElementById('scopeReceive').checked) scopes.push('receive');
+
+            if (scopes.length === 0) {
+                alert('Please select at least one scope');
+                return;
+            }
+
+            try {
+                const response = await fetch('/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ id, url, scopes })
+                });
+
+                if (response.ok) {
+                    document.getElementById('registerForm').reset();
+                    fetchServices();
+                    alert('Service registered successfully!');
+                } else {
+                    const data = await response.json();
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function fetchServices() {
+            const loading = document.getElementById('loading');
+            const table = document.getElementById('servicesTable');
+            const tbody = document.getElementById('servicesBody');
+            
+            loading.style.display = 'block';
+            table.style.display = 'none';
+            tbody.innerHTML = '';
+
+            try {
+                const response = await fetch('/api/services');
+                const services = await response.json();
+
+                services.forEach(service => {
+                    const tr = document.createElement('tr');
+                    
+                    // Parse scopes if they are strings (legacy) or use as is
+                    let scopes = service.scopes;
+                    if (typeof scopes === 'string') {
+                        try {
+                            scopes = JSON.parse(scopes);
+                        } catch (e) {
+                            scopes = scopes.split(',');
+                        }
+                    }
+
+                    const scopesHtml = scopes.map(scope => {
+                        let className = 'scope-tag';
+                        if (scope === 'request') className += ' scope-request';
+                        if (scope === 'receive') className += ' scope-receive';
+                        return `<span class="${className}">${scope}</span>`;
+                    }).join('');
+
+                    tr.innerHTML = `
+                        <td><strong>${service.id}</strong></td>
+                        <td>${service.url}</td>
+                        <td>${scopesHtml}</td>
+                        <td>
+                            <button onclick="deleteService('${service.id}')" style="color: red; border: 1px solid red; background: white; border-radius: 4px; padding: 4px 8px; cursor: pointer;">Unregister</button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                loading.style.display = 'none';
+                table.style.display = 'table';
+            } catch (error) {
+                loading.innerText = 'Error loading services: ' + error.message;
+                console.error(error);
+            }
+        }
+
+        async function deleteService(id) {
+            if (!confirm(`Are you sure you want to unregister ${id}?`)) return;
+            
+            try {
+                const response = await fetch(`/unregister/${id}`, { method: 'DELETE' });
+                if (response.ok) {
+                    fetchServices();
+                } else {
+                    alert('Failed to unregister service');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Initial load
+        fetchServices();
+    </script>
+</body>
+</html>
