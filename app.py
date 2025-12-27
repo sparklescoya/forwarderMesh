@@ -89,8 +89,8 @@ async def get_service(service_id):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
-@app.route('/request/<service_id>/<path:subpath>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
-async def proxy_request(service_id, subpath):
+@app.route('/request/<path:request_path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
+async def proxy_request(request_path):
     # The thing trying to request should also be a registered service with a 'request' scope
     caller_id = request.headers.get('X-Service-ID')
     if not caller_id:
@@ -110,22 +110,38 @@ async def proxy_request(service_id, subpath):
             if 'request' not in caller_scopes:
                  return jsonify({"error": "Caller does not have 'request' scope"}), 403
 
+        # Match the longest prefix as a service id
+        parts = request_path.split('/')
+        subpath = ""
+        target_row = None
+
+        for i in range(len(parts), 0, -1):
+            potential_id = "/".join(parts[:i])
+            potential_subpath = "/".join(parts[i:])
+            
+            async with db.execute('SELECT url, scopes FROM services WHERE id = ?', (potential_id,)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    subpath = potential_subpath
+                    target_row = row
+                    break
+        
+        if not target_row:
+             return jsonify({"error": "Target service not found"}), 404
+
         # Get target url and scopes
-        target_url = None
-        async with db.execute('SELECT url, scopes FROM services WHERE id = ?', (service_id,)) as cursor:
-            target_row = await cursor.fetchone()
-            if target_row:
-                target_url = target_row['url']
-                target_scopes = json.loads(target_row['scopes'])
-                
-                if 'receive' not in target_scopes:
-                    return jsonify({"error": "Target service does not have 'receive' scope"}), 403
-            else:
-                 return jsonify({"error": "Target service not found"}), 404
+        target_url = target_row['url']
+        target_scopes = json.loads(target_row['scopes'])
+        
+        if 'receive' not in target_scopes:
+            return jsonify({"error": "Target service does not have 'receive' scope"}), 403
 
     # Make url
     target_url = target_url.rstrip('/')
-    dest_url = f"{target_url}/{subpath}"
+    if subpath:
+        dest_url = f"{target_url}/{subpath}"
+    else:
+        dest_url = target_url
     
     method = request.method
     
