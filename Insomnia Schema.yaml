@@ -1,0 +1,147 @@
+type: collection.insomnia.rest/5.0
+schema_version: "5.1"
+name: Forwarder Mesh
+meta:
+  id: wrk_1d30b57d0e7844fa9e29579c81d4f3fc
+  created: 1766848382025
+  modified: 1766848382025
+  description: ""
+collection:
+  - url: "{{ _.base }}/register"
+    name: Register Service
+    meta:
+      id: req_ee7aaf9520ef404abe26b0775cc6a1b2
+      created: 1766848385847
+      modified: 1766850248010
+      isPrivate: false
+      description: ""
+      sortKey: -1766848385847
+    method: POST
+    body:
+      mimeType: application/json
+      text: |-
+        {
+        	"id": "{{ _['test-service-A'] }}",
+        	"url": "localhost:5001",
+        	"scopes": ["request", "receive"] 
+        }
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: User-Agent
+        value: insomnia/12.2.0
+        description: ""
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base }}/unregister/{{ _['test-service-A'] }}"
+    name: Unregister Service
+    meta:
+      id: req_243724ef1cf7414780f1aa6006de3516
+      created: 1766849383274
+      modified: 1766851030093
+      isPrivate: false
+      description: ""
+      sortKey: -1764870644515.5
+    method: DELETE
+    body:
+      mimeType: application/json
+      text: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: User-Agent
+        value: insomnia/12.2.0
+        description: ""
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base }}/get/{{ _['test-service-A'] }}"
+    name: Get Service Details
+    meta:
+      id: req_c146a0b6fba1431eaa755d7495b985f0
+      created: 1766849692518
+      modified: 1766850164926
+      isPrivate: false
+      description: ""
+      sortKey: -1763881773849.75
+    method: GET
+    body:
+      mimeType: application/json
+      text: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: User-Agent
+        value: insomnia/12.2.0
+        description: ""
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+  - url: "{{ _.base }}/request/{{ _['test-service-B'] }}/endpoint"
+    name: Proxy Request Example
+    meta:
+      id: req_12c4850173f54653ac07d04fb780827e
+      created: 1766849856828
+      modified: 1766850211607
+      isPrivate: false
+      description: ""
+      sortKey: -1763387338516.875
+    method: POST
+    body:
+      mimeType: application/json
+      text: ""
+    headers:
+      - name: Content-Type
+        value: application/json
+      - name: User-Agent
+        value: insomnia/12.2.0
+        description: ""
+        disabled: false
+      - name: X-Service-ID
+        value: "{{ _['test-service-A'] }}"
+        description: ""
+        disabled: false
+    settings:
+      renderRequestBody: true
+      encodeUrl: true
+      followRedirects: global
+      cookies:
+        send: true
+        store: true
+      rebuildPath: true
+cookieJar:
+  name: Default Jar
+  meta:
+    id: jar_d917ca5010e0461d27a8dc69afa4ff34af3af590
+    created: 1766848382026
+    modified: 1766848382026
+environments:
+  name: Base Environment
+  meta:
+    id: env_d917ca5010e0461d27a8dc69afa4ff34af3af590
+    created: 1766848382026
+    modified: 1766850140086
+    isPrivate: false
+  data:
+    base: http://localhost:5000
+    test-service-A: test-service-a
+    test-service-B: test-service-b
