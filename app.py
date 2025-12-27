@@ -1,4 +1,5 @@
 import os
+import json
 from quart import Quart, jsonify, request, Response
 import aiosqlite
 import aiohttp
@@ -33,16 +34,19 @@ async def register():
     service_id = data['id']
     url = data['url']
     scopes = data['scopes']
-    
-    # Scopes to string if list
-    if isinstance(scopes, list):
-        scopes = ",".join(scopes)
+    scopes = [scopes]
+
+    if not isinstance(scopes, list):
+        return jsonify({"error": "Scopes must be a list of strings"}), 400
+
+    # Store as JSON string
+    scopes_json = json.dumps(scopes)
 
     try:
         async with aiosqlite.connect(DB_PATH) as db:
             await db.execute(
                 'INSERT OR REPLACE INTO services (id, url, scopes) VALUES (?, ?, ?)',
-                (service_id, url, scopes)
+                (service_id, url, scopes_json)
             )
             await db.commit()
         return jsonify({"message": "Service registered successfully", "id": service_id}), 201
@@ -53,16 +57,21 @@ async def register():
 async def get_service(service_id):
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute('SELECT * FROM services WHERE id = ?', (service_id,)) as cursor:
-            row = await cursor.fetchone()
-            if row:
-                return jsonify({
-                    "id": row['id'],
-                    "url": row['url'],
-                    "scopes": row['scopes']
-                })
-            else:
-                return jsonify({"error": "Service not found"}), 404
+        try:
+            async with db.execute('SELECT * FROM services WHERE id = ?', (service_id,)) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    scopes = json.loads(row['scopes'])
+                        
+                    return jsonify({
+                        "id": row['id'],
+                        "url": row['url'],
+                        "scopes": scopes
+                    })
+                else:
+                    return jsonify({"error": "Service not found"}), 404
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
 @app.route('/request/<service_id>/<path:subpath>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
 async def proxy_request(service_id, subpath):
@@ -80,7 +89,11 @@ async def proxy_request(service_id, subpath):
             if not caller_row:
                 return jsonify({"error": "Caller not authorized"}), 403
             
-            caller_scopes = caller_row['scopes'].split(',')
+            try:
+                caller_scopes = json.loads(caller_row['scopes'])
+            except json.JSONDecodeError:
+                caller_scopes = caller_row['scopes'].split(',')
+
             if 'request' not in caller_scopes:
                  return jsonify({"error": "Caller does not have 'request' scope"}), 403
 
@@ -90,7 +103,10 @@ async def proxy_request(service_id, subpath):
             target_row = await cursor.fetchone()
             if target_row:
                 target_url = target_row['url']
-                target_scopes = target_row['scopes'].split(',')
+                try:
+                    target_scopes = json.loads(target_row['scopes'])
+                except json.JSONDecodeError:
+                    target_scopes = target_row['scopes'].split(',')
                 
                 if 'receive' not in target_scopes:
                     return jsonify({"error": "Target service does not have 'receive' scope"}), 403
