@@ -34,7 +34,6 @@ async def register():
     service_id = data['id']
     url = data['url']
     scopes = data['scopes']
-    scopes = [scopes]
 
     if not isinstance(scopes, list):
         return jsonify({"error": "Scopes must be a list of strings"}), 400
@@ -60,6 +59,10 @@ async def unregister(service_id):
     
     try:
         async with aiosqlite.connect(DB_PATH) as db:
+            async with db.execute('SELECT 1 FROM services WHERE id = ?', (service_id,)) as cursor:
+                if not await cursor.fetchone():
+                    return jsonify({"error": "Service not found"}), 404
+            
             await db.execute('DELETE FROM services WHERE id = ?', (service_id,))
             await db.commit()
         return jsonify({"message": "Service unregistered successfully", "id": service_id}), 200
@@ -102,11 +105,8 @@ async def proxy_request(service_id, subpath):
             if not caller_row:
                 return jsonify({"error": "Caller not authorized"}), 403
             
-            try:
-                caller_scopes = json.loads(caller_row['scopes'])
-            except json.JSONDecodeError:
-                caller_scopes = caller_row['scopes'].split(',')
-
+            caller_scopes = json.loads(caller_row['scopes'])
+       
             if 'request' not in caller_scopes:
                  return jsonify({"error": "Caller does not have 'request' scope"}), 403
 
@@ -116,15 +116,12 @@ async def proxy_request(service_id, subpath):
             target_row = await cursor.fetchone()
             if target_row:
                 target_url = target_row['url']
-                try:
-                    target_scopes = json.loads(target_row['scopes'])
-                except json.JSONDecodeError:
-                    target_scopes = target_row['scopes'].split(',')
+                target_scopes = json.loads(target_row['scopes'])
                 
                 if 'receive' not in target_scopes:
                     return jsonify({"error": "Target service does not have 'receive' scope"}), 403
             else:
-                 return jsonify({"error": "Service not found"}), 404
+                 return jsonify({"error": "Target service not found"}), 404
 
     # Make url
     target_url = target_url.rstrip('/')
