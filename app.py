@@ -48,7 +48,8 @@ async def register():
                 (service_id, url, scopes_json)
             )
             await db.commit()
-        return jsonify({"message": "Service registered successfully", "id": service_id}), 201
+        access_url = f"/request/{service_id}"
+        return jsonify({"message": "Service registered successfully", "id": service_id, "access_url": access_url}), 201
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
