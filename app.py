@@ -111,7 +111,7 @@ async def list_services():
 @app.route('/request/<path:request_path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
 async def proxy_request(request_path):
     # The thing trying to request should also be a registered service with a 'request' scope
-    caller_id = request.headers.get('X-Service-ID')
+    caller_id = request.headers.get('TEST')
     if not caller_id:
         return jsonify({"error": "Unauthorized: Missing X-Service-ID header"}), 401
 
