@@ -1,8 +1,16 @@
 import os
 import json
+import logging
 from quart import Quart, jsonify, request, Response, render_template
 import aiosqlite
 import aiohttp
+
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = Quart(__name__)
 DB_PATH = 'Data/service_workers.db'
@@ -112,7 +120,10 @@ async def list_services():
 async def proxy_request(request_path):
     # The thing trying to request should also be a registered service with a 'request' scope
     caller_id = request.headers.get('TEST')
+    logger.debug(f"Proxy request: path={request_path}, caller_id={caller_id}, method={request.method}")
+    
     if not caller_id:
+        logger.warning(f"Unauthorized proxy request: missing X-Service-ID header")
         return jsonify({"error": "Unauthorized: Missing X-Service-ID header"}), 401
 
     async with aiosqlite.connect(DB_PATH) as db:
@@ -122,12 +133,14 @@ async def proxy_request(request_path):
         async with db.execute('SELECT scopes FROM services WHERE id = ?', (caller_id,)) as cursor:
             caller_row = await cursor.fetchone()
             if not caller_row:
+                logger.warning(f"Caller not found: {caller_id}")
                 return jsonify({"error": "Caller not authorized"}), 403
             
             caller_scopes = json.loads(caller_row['scopes'])
        
             if 'request' not in caller_scopes:
-                 return jsonify({"error": "Caller does not have 'request' scope"}), 403
+                logger.warning(f"Caller {caller_id} missing 'request' scope")
+                return jsonify({"error": "Caller does not have 'request' scope"}), 403
 
         # Match the longest prefix as a service id
         parts = request_path.split('/')
@@ -143,16 +156,19 @@ async def proxy_request(request_path):
                 if row:
                     subpath = potential_subpath
                     target_row = row
+                    logger.debug(f"Found service: id={potential_id}, subpath={subpath}")
                     break
         
         if not target_row:
-             return jsonify({"error": "Target service not found"}), 404
+            logger.warning(f"Target service not found for path: {request_path}")
+            return jsonify({"error": "Target service not found"}), 404
 
         # Get target url and scopes
         target_url = target_row['url']
         target_scopes = json.loads(target_row['scopes'])
         
         if 'receive' not in target_scopes:
+            logger.warning(f"Target service missing 'receive' scope")
             return jsonify({"error": "Target service does not have 'receive' scope"}), 403
 
     # Make url
@@ -162,11 +178,14 @@ async def proxy_request(request_path):
     else:
         dest_url = target_url
     
+    logger.info(f"Proxying {request.method} request to: {dest_url}")
+    
     method = request.method
     
     # Filter headers to avoid conflicts
     excluded_headers = {'host', 'content-length', 'transfer-encoding', 'connection', 'keep-alive'}
     headers = {key: value for key, value in request.headers.items() if key.lower() not in excluded_headers}
+    logger.debug(f"Forwarded headers: {list(headers.keys())}")
     
     # Get data and params
     data = await request.get_data()
@@ -175,8 +194,10 @@ async def proxy_request(request_path):
     timeout = aiohttp.ClientTimeout(total=30)
     async with aiohttp.ClientSession(timeout=timeout) as session:
         try:
+            logger.debug(f"Making request: {method} {dest_url}")
             async with session.request(method, dest_url, headers=headers, data=data, params=params, ssl=False) as resp:
                 content = await resp.read()
+                logger.info(f"Upstream response: status={resp.status}, content_length={len(content)}")
                 
                 # Quart response
                 response = Response(content, status=resp.status)
@@ -188,8 +209,10 @@ async def proxy_request(request_path):
                         
                 return response
         except aiohttp.ClientError as e:
-             return jsonify({"error": f"Internal upstream error: {str(e)}"}), 502
+            logger.error(f"Upstream connection error: {str(e)}", exc_info=True)
+            return jsonify({"error": f"Internal upstream error: {str(e)}"}), 502
         except Exception as e:
+            logger.error(f"Proxy error: {str(e)}", exc_info=True)
             return jsonify({"error": f"Internal proxy error: {str(e)}"}), 500
 
 if __name__ == '__main__':
