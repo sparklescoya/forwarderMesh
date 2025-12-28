@@ -90,6 +90,24 @@ async def get_service(service_id):
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+@app.route('/list', methods=['GET'])
+async def list_services():
+    try:
+        async with aiosqlite.connect(DB_PATH) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute('SELECT id, url, scopes FROM services') as cursor:
+                rows = await cursor.fetchall()
+                services = []
+                for row in rows:
+                    services.append({
+                        "id": row['id'],
+                        "url": row['url'],
+                        "scopes": json.loads(row['scopes'])
+                    })
+                return jsonify({"services": services}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/request/<path:request_path>', methods=['GET', 'POST', 'PUT', 'DELETE', 'PATCH'])
 async def proxy_request(request_path):
     # The thing trying to request should also be a registered service with a 'request' scope
@@ -146,17 +164,18 @@ async def proxy_request(request_path):
     
     method = request.method
     
-    # Filter headers to avoid conflicts (e.g. Host) *
-    # Todo: figure out what will break later
-    headers = {key: value for key, value in request.headers.items() if key.lower() != 'host'}
+    # Filter headers to avoid conflicts
+    excluded_headers = {'host', 'content-length', 'transfer-encoding', 'connection', 'keep-alive'}
+    headers = {key: value for key, value in request.headers.items() if key.lower() not in excluded_headers}
     
     # Get data and params
     data = await request.get_data()
     params = request.args
 
-    async with aiohttp.ClientSession() as session:
+    timeout = aiohttp.ClientTimeout(total=30)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
         try:
-            async with session.request(method, dest_url, headers=headers, data=data, params=params) as resp:
+            async with session.request(method, dest_url, headers=headers, data=data, params=params, ssl=False) as resp:
                 content = await resp.read()
                 
                 # Quart response
