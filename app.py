@@ -183,7 +183,6 @@ async def proxy_request(request_path):
     method = request.method
     
     # Filter headers to avoid conflicts
-    # Exclude accept-encoding to prevent compression issues
     excluded_headers = {'host', 'content-length', 'transfer-encoding', 'connection', 'keep-alive', 'accept-encoding'}
     headers = {key: value for key, value in request.headers.items() if key.lower() not in excluded_headers}
     logger.debug(f"Forwarded headers: {list(headers.keys())}")
